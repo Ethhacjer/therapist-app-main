@@ -1,128 +1,252 @@
-// Import necessary hooks from React
 import { useState, useEffect, useRef } from 'react';
-
-// Import CSS styles for the component
 import './faltu.css';
 
-/**
- * ChatPage component: a simple chat interface with an AI therapist.
- * 
- * @returns {JSX.Element} The chat interface.
- */
 const ChatPage = () => {
-  // State to store the user's chat input
   const [chatInput, setChatInput] = useState('');
-
-  // State to store the chat messages
   const [chatMessages, setChatMessages] = useState([
-    // Initial message from the AI therapist
     { text: "Hello, I'm here to listen. What's on your mind?", sender: 'ai' },
   ]);
-
-  // Reference to the end of the chat messages container
+  const [chatEnded, setChatEnded] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const chatEndRef = useRef(null);
 
-  /**
-   * Handle changes to the chat input field.
-   * 
-   * @param {Event} e - The input event.
-   */
   const handleChatInput = (e) => {
-    // Update the chat input state with the new value
     setChatInput(e.target.value);
   };
 
-  /**
-   * Handle submission of the chat form.
-   * 
-   * @param {Event} e - The form submission event.
-   */
-  const handleChatSubmit = (e) => {
-    // Prevent default form submission behavior
+  const handleChatSubmit = async (e) => {
     e.preventDefault();
 
-    // Check if the chat input is not empty
     if (chatInput.trim() !== '') {
-      // Create a new message object with the user's input
-      const userMessage = { text: chatInput, sender: 'user', timestamp: new Date() };
+      if (chatEnded && chatInput.trim().toLowerCase() === 'restart') {
+        setChatMessages([
+          { text: "Hello, I'm here to listen. What's on your mind?", sender: 'ai' }
+        ]);
+        setChatEnded(false);
+        setChatInput('');
+        return;
+      }
 
-      // Add the user's message to the chat messages state
-      setChatMessages((prevMessages) => [...prevMessages, userMessage]);
+      if (chatInput.trim().toLowerCase() === 'exit') {
+        const userMessage = { text: chatInput, sender: 'user', timestamp: new Date() };
+        const exitMessage = {
+          text: "Chat session has ended. You can now generate your therapy report.",
+          sender: 'ai',
+          timestamp: new Date()
+        };
 
-      // Clear the chat input field
-      setChatInput('');
+        setChatMessages((prevMessages) => [...prevMessages, userMessage, exitMessage]);
+        setChatInput('');
+        setChatEnded(true);
+        return;
+      }
 
-      // Simulate a delay for the AI therapist's response
-      setTimeout(() => {
-        // Create a new message object with the AI therapist's response
-        const aiResponse = { text: "I'm here to listen and help.", sender: 'ai', timestamp: new Date() };
+      if (!chatEnded) {
+        const userMessage = { text: chatInput, sender: 'user', timestamp: new Date() };
+        setChatMessages((prevMessages) => [...prevMessages, userMessage]);
+        setChatInput('');
 
-        // Add the AI therapist's response to the chat messages state
-        setChatMessages((prevMessages) => [...prevMessages, aiResponse]);
-      }, 1000);
+        try {
+          const response = await fetch('http://127.0.0.1:5000/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: chatInput }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            const aiMessage = { text: data.ai_response, sender: 'ai', timestamp: new Date() };
+            setChatMessages((prevMessages) => [...prevMessages, aiMessage]);
+          } else {
+            console.error("API Error:", data.error);
+            const errorMessage = { text: "Error: Unable to fetch response.", sender: 'ai', timestamp: new Date() };
+            setChatMessages((prevMessages) => [...prevMessages, errorMessage]);
+          }
+        } catch (error) {
+          console.error("Network error:", error);
+          const errorMessage = { text: "Error: Unable to connect to the server.", sender: 'ai', timestamp: new Date() };
+          setChatMessages((prevMessages) => [...prevMessages, errorMessage]);
+        }
+      } else {
+        setChatInput('');
+        setChatMessages((prevMessages) => [
+          ...prevMessages,
+          {
+            text: "Chat has ended. Type 'restart' to begin a new session or use the Generate Report button.",
+            sender: 'ai',
+            timestamp: new Date()
+          }
+        ]);
+      }
     }
   };
 
-  /**
-   * Effect to scroll to the bottom of the chat messages container when new messages are added.
-   */
-  useEffect(() => {
-    // Check if the chatEndRef is not null
-    if (chatEndRef.current) {
-      // Log a message to the console for debugging purposes
-      console.log('Scrolling to the bottom...');
+  const handleGenerateReport = async () => {
+    if (isGeneratingReport) return;
 
-      // Scroll to the bottom of the chat messages container
+    setIsGeneratingReport(true);
+
+    const loadingMessage = {
+      text: "Generating your therapy report...",
+      sender: 'ai',
+      timestamp: new Date()
+    };
+
+    setChatMessages((prevMessages) => [...prevMessages, loadingMessage]);
+
+    try {
+      const response = await fetch('http://127.0.0.1:5000/generate_report');
+      const data = await response.json();
+
+      if (response.ok) {
+        setChatMessages((prevMessages) =>
+          prevMessages.filter(msg => msg !== loadingMessage)
+        );
+
+        const reportMessage = {
+          text: "Therapy report generated.",
+          sender: 'ai',
+          timestamp: new Date(),
+          reportImage: data.report_image_url,
+          reportDownloadUrl: data.report_text_url
+        };
+
+        setChatMessages((prevMessages) => [...prevMessages, reportMessage]);
+      } else {
+        console.error("API Error:", data.error);
+        setChatMessages((prevMessages) =>
+          prevMessages.map(msg =>
+            msg === loadingMessage
+              ? {
+                text: "Error: Unable to generate report.",
+                sender: 'ai',
+                timestamp: new Date()
+              }
+              : msg
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Network error:", error);
+      setChatMessages((prevMessages) =>
+        prevMessages.map(msg =>
+          msg === loadingMessage
+            ? {
+              text: "Error: Unable to connect to the server.",
+              sender: 'ai',
+              timestamp: new Date()
+            }
+            : msg
+        )
+      );
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
+  useEffect(() => {
+    if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [chatMessages]); // Re-run the effect when the chat messages state changes
+  }, [chatMessages]);
 
-  // Return the JSX element for the chat interface
   return (
     <div className="chat-area">
-      <h1 className="chat-title">AI Therapist</h1>
+      <div className="chat-header">
+        <h1 className="chat-title">AI Therapist</h1>
+        <button className="home-button" onClick={() => window.location.href = '/homePage.jsx'}>Home</button>
+      </div>
+      {chatEnded ? (
+        <button
+          onClick={handleGenerateReport}
+          className={`report-btn ${isGeneratingReport ? 'disabled' : ''}`}
+          disabled={isGeneratingReport}
+        >
+          {isGeneratingReport ? 'Generating...' : 'Generate Therapy Report'}
+        </button>
+      ) : (
+        <button disabled className="report-btn disabled">
+          Generate Therapy Report
+        </button>
+      )}
+
       <hr className="divider" />
+
       <div className="chat-messages">
-        {/*
-          Map over the chat messages state and render each message as a chat bubble.
-        */}
         {chatMessages.map((message, index) => (
           <div key={index} className={`chat-bubble ${message.sender}`}>
             {message.text}
+            {message.reportDownloadUrl && (
+              <div className="download-container" style={{ marginTop: '10px' }}>
+                <a
+                  href="http://127.0.0.1:5000/therapy_report.txt"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="download-link"
+                  style={{ backgroundColor: '#FF9800', marginRight: '10px' }}
+                >
+                  View Text Report
+                </a>
+                <a
+                  href="http://127.0.0.1:5000/download_therapy_report.txt"
+                  download="therapy_report.txt"
+                  className="download-link"
+                  style={{ backgroundColor: '#2196F3', marginRight: '10px' }}
+                >
+                  Download Text Report
+                </a>
+              </div>
+            )}
+
+            {message.reportImage && (
+              <div className="download-container" style={{ marginTop: '10px' }}>
+                <a
+                  href={`http://127.0.0.1:5000${message.reportImage}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="download-link"
+                  style={{ backgroundColor: '#4CAF50', marginRight: '10px' }}
+                >
+                  View Image Report
+                </a>
+                <a
+                  href={`http://127.0.0.1:5000${message.reportImage}?download=true`}
+                  download="sentiment_report.png"
+                  className="download-link"
+                  style={{ backgroundColor: '#673AB7' }}
+                >
+                  Download Image Report
+                </a>
+              </div>
+            )}
+
             <span className="timestamp">
-              {/*
-                Display the timestamp for the message if it exists.
-              */}
-              {message.timestamp ? new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}
+              {message.timestamp
+                ? new Date(message.timestamp).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                : ''}
             </span>
           </div>
         ))}
-        
-        {/*
-          Reference to the end of the chat messages container.
-        */}
         <div ref={chatEndRef} />
       </div>
+
       <form onSubmit={handleChatSubmit} className="chat-form">
-        {/*
-          Input field for the user to type their message.
-        */}
         <input
           type="text"
           value={chatInput}
           onChange={handleChatInput}
           className="chat-input"
-          placeholder="Type a message..."
+          placeholder={chatEnded ? "Type 'restart' to begin again..." : "Type a message or 'exit' to end..."}
           maxLength={200}
         />
-        {/*
-          Button to submit the chat form.
-        */}
         <button type="submit" className="send">Send</button>
       </form>
     </div>
   );
 };
 
-// Export the ChatPage component
 export default ChatPage;

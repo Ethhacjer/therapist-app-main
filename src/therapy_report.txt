@@ -1,0 +1,33 @@
+Therapy Session Report
+Age: 20
+Number of messages: 3
+Average sentiment score: -0.17
+Exam seasons: 3
+Most common stress reason: Academic Stress
+
+Conversation summary:
+1. User: Hi, I have been feeling really down for the past few months. I'm struggling to keep up with my studies, and it feels like everything is just too overwhelming. I don't have much motivation to do anything, and I can't seem to shake off this constant sadness.
+   Timestamp: 2025-05-02 08:41:27.775019
+   Sentiment: -0.50
+   Exam Season: Yes
+   Stress Reason: Academic Stress
+
+2. User: heyy
+   Timestamp: 2025-05-02 08:41:28.415772
+   Sentiment: 0.00
+   Exam Season: Yes
+   Stress Reason: Academic Stress
+
+3. User: dk
+   Timestamp: 2025-05-02 08:41:28.905157
+   Sentiment: 0.00
+   Exam Season: Yes
+   Stress Reason: Academic Stress
+
+Suggested Ways to Overcome Stress:
+
+Academic Stress:
+  - Create a study schedule to manage your time effectively.
+  - Take regular breaks to avoid burnout.
+  - Seek help from teachers or classmates if you're struggling with a subject.
+  - Practice relaxation techniques such as deep breathing or meditation.
